@@ -1,0 +1,40 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE,warning=FALSE}
+#download the data
+library(GEOquery)
+library(knitr)
+gds<-getGEO("GSE217567",GSEMatrix=FALSE)
+#kable(data.frame(head(GEOquery::Meta(gds))), format = "html")
+sfiles = getGEOSuppFiles('GSE217567')
+fnames = rownames(sfiles)
+smo_exp = read.delim(fnames[1],header=TRUE,check.names = FALSE)
+```
+
+```{r message=FALSE}
+#Access
+summary(smo_exp)
+```
+
+
+```{r message=FALSE}
+#Normalization
+library(edgeR)
+dedup_exp<-smo_exp[!duplicated(smo_exp$Gene),]
+rownames(dedup_exp)<-dedup_exp$Gene
+dedup_exp<-dedup_exp[,-1]
+group <- rep(c('control', 'treat'), each = 3)
+dgelist <- DGEList(counts = dedup_exp, group = group)
+keep <- rowSums(cpm(dgelist) > 1 ) >= 2
+dgelist <- dgelist[keep, , keep.lib.sizes = FALSE]
+dgelist_norm <- calcNormFactors(dgelist, method = 'TMM')
+summary(dgelist)
+summary(dgelist_norm)
+```
+
+
