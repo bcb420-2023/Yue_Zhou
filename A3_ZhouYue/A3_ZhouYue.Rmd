@@ -1,0 +1,98 @@
+---
+title: "Assignment3"
+author: "Student Name: Yue Zhou"
+output: 
+  html_document: 
+    toc: yes
+date: '2023-04-04'
+---
+
+## Indroduction
+### Data background
+Centrosomal protein 120 (CEP120) is a 120kD centrosome protein that plays an important role in centrosome replication. Overexpression of CEP120 can lead to centrosome amplification, which is closely associated with tumorigenesis and development. The authors want to know whether the overexpression of CEP120 will promot centrosome amplification in gastric cancer (GC).  
+
+### Data source
+The expression data was downloaded from GEO with ID GSE217567.This is a gastric cancer data.There are 6 samples(3 case and 3 control).CEP120.1~3 are cases and Vector1~3 are controls.The materials are cell line.Three case cell line were CEP120-overexpressed and the other three control cell line were not treated in anyway. 
+
+### Previous analysis
+I did data normalization firstly. Then I did differential gene expression analysis.14 genes were significantly differentially expressed under my threshold.Then I did geneset enrichment analysis with the 14 genes.The details of my previous analysis are listed at https://github.com/bcb420-2023/Yue_Zhou/blob/main/A2_ZhouYue/A2_ZhouYue.html.
+
+## Non-thresholded Gene set Enrichment Analysis
+#### 1.What method did you use? What genesets did you use? Make sure to specify versions and cite your methods.
+I use clusterProfiler(v4.6.2) to do the gsea analysis.I use the 14 differential expressed genes.
+```{r message=FALSE,warning=FALSE}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(ggridges)
+library(ggplot2)
+library(fgsea)
+readscount<-read.table('GSE217567_processed_count.txt',header=TRUE)
+readscount<-readscount[!duplicated(readscount$Gene),]
+rownames(readscount)<-readscount$Gene
+readscount<-readscount[,-1]
+rawResult<-read.csv('rawResults.csv',header = TRUE,row.names = 1)
+DEG_genes <- rawResult[rawResult$PValue<0.05,]
+DEG_gene_expr <- readscount[rownames(DEG_genes),]
+DEG_genes$SYMBOL<-rownames(DEG_genes)
+gene_names<-bitr(rownames(DEG_genes), fromType = "SYMBOL", toType = c("ENTREZID"), OrgDb = org.Hs.eg.db)
+DEG_genes<-merge(DEG_genes,gene_names,by='SYMBOL')
+rankfile<-DEG_genes[,c(7,2)]
+rankfile<-rankfile[order(rankfile$logFC,decreasing = TRUE),]
+#gmt<-read.gmt('c5.all.v2023.1.Hs.entrez.gmt')
+#1.all genesets 
+genelist<-rankfile[,2]
+names(genelist)<-as.character(rankfile[,1])
+#gsea_all<-GSEA(genelist,TERM2GENE = gmt,pvalueCutoff=1)
+#save(gsea_all,file = 'gsea_all.RData')
+#number of genesets with all differential expressed genes
+load('gsea_all.RData')
+
+```
+#### 2.Summarize your enrichment results.
+I got 873 enrichment results. There are 10~72 genes in each pathway.
+```{r message=FALSE,warning=FALSE}
+nrow(gsea_all@result[which(gsea_all@result$pvalue<1),])
+enrich_result<-gsea_all@result[which(gsea_all@result$pvalue<1),]
+summary(enrich_result)
+```
+#### 3.How do these results compare to the results from the thresholded analysis in Assignment #2. Compare qualitatively. Is this a straight forward comparison? Why or why not?
+When I use pvalue<0.05 as threshold,I got only 17 enrichment results.But now I got 873 results.I don't think it is a straight forward comparsion.Because the they use the same method. They just differed in the threshold.
+
+## Visualize your Gene set Enrichment Analysis in Cytoscape
+#### 1.Create an enrichment map - how many nodes and how many edges in the resulting map? What thresholds were used to create this map? Make sure to record all thresholds. Include a screenshot of your network prior to manual layout.
+There are 125 edges in the resulting map.I used pvalue<0.0.05 to create this map.The raw screenshot and the final network are listed below:
+![Caption for the picture.](/dssg/home/acct-clswcc/clswcc-jd/makemoney/raw.png)
+![Caption for the picture.](/dssg/home/acct-clswcc/clswcc-jd/makemoney/dataForNet.txt.png)
+```{r message=FALSE,warning=FALSE}
+resultForNet<-gsea_all@result[which(gsea_all@result$pvalue<0.05),][,c('ID','core_enrichment')]
+rownames(resultForNet)<-NULL
+Pathway<-c()
+GeneID<-c()
+for(i in 1:nrow(resultForNet)){
+  genes<-strsplit(resultForNet[i,2],'/')[[1]]
+  for(j in 1:length(genes)){
+    Pathway<-c(Pathway,resultForNet[i,1])
+    GeneID<-c(GeneID,genes[j])
+  }
+}
+dataForNet<-data.frame(Pathway,GeneID)
+write.table(dataForNet,file = 'dataForNet.txt',sep="\t",row.names = FALSE,quote = FALSE)
+```
+
+#### 2.Annotate your network - what parameters did you use to annotate the network. If you are using the default parameters make sure to list them as well.
+I think I needn't to annotate my network.It is easy to read.The green color nodes are genes and the orange color nodes are pathways.
+
+### 3.Make a publication ready figure - include this figure with proper legends in your notebook.
+The final network with a legend is listed below:
+
+![Pathways and genes interaction network](/dssg/home/acct-clswcc/clswcc-jd/makemoney/dataForNet.legend.png)
+
+## Interpretation and detailed view of results
+
+#### 1.Do the enrichment results support conclusions or mechanism discussed in the original paper? How do these results differ from the results you got from Assignment2 thresholded methods
+
+From the enrichment analysis with the 14 DEGs,some of the pathways in the results did have a relationship with the development of gastric disorders,such as "GOCC_INTRACELLULAR_PROTEIN_CONTAINING_COMPLEX","GOBP_REGULATION_OF_DEFENSE_RESPONSE","GOBP_INFLAMMATORY_RESPONSE","GOBP_REGULATION_OF_DEFENSE_RESPONSE".This support the original paper.And the results are almost the same as the results I got from Assignment2.
+
+#### 2.Can you find evidence, i.e. publications, to support some of the results that you see. How does this evidence support your result?
+Sorry,I didn't.
+
